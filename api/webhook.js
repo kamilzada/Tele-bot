@@ -11,10 +11,27 @@ Reply APPROVE or REJECT to a draft to record your decision.`;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    // Health check. Reports which settings are present (never their values).
+    // Health check. Reports which settings are present (never their values),
+    // which bot the token belongs to, and what Telegram sees for the webhook.
+    const [bot, webhook] = await Promise.all([
+      getTelegram('getMe'),
+      getTelegram('getWebhookInfo'),
+    ]);
     return res.status(200).json({
       ok: true,
       service: 'meera-content-bot',
+      bot: bot.ok ? `@${bot.result.username}` : `token rejected by Telegram: ${bot.description}`,
+      webhook: webhook.ok
+        ? {
+            url: webhook.result.url,
+            pending: webhook.result.pending_update_count,
+            lastError: webhook.result.last_error_message ?? null,
+            lastErrorAt: webhook.result.last_error_date
+              ? new Date(webhook.result.last_error_date * 1000).toISOString()
+              : null,
+            allowedUpdates: webhook.result.allowed_updates ?? 'default',
+          }
+        : webhook.description,
       config: {
         telegramToken: Boolean(config.telegramToken),
         geminiKey: Boolean(config.geminiKey),
@@ -88,6 +105,15 @@ export default async function handler(req, res) {
     }
     // Always 200 so Telegram doesn't keep re-sending the same update.
     return res.status(200).json({ ok: false });
+  }
+}
+
+async function getTelegram(method) {
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${config.telegramToken}/${method}`);
+    return await r.json();
+  } catch (err) {
+    return { ok: false, description: err.message };
   }
 }
 

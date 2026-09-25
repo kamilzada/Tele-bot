@@ -11,7 +11,20 @@ Reply APPROVE or REJECT to a draft to record your decision.`;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(200).json({ ok: true, service: 'meera-content-bot' });
+    // Health check. Reports which settings are present (never their values).
+    return res.status(200).json({
+      ok: true,
+      service: 'meera-content-bot',
+      config: {
+        telegramToken: Boolean(config.telegramToken),
+        geminiKey: Boolean(config.geminiKey),
+        anthropicKey: Boolean(config.anthropicKey),
+        supabase: Boolean(config.supabaseUrl && config.supabaseKey),
+        webhookSecret: Boolean(config.webhookSecret),
+        allowedChatIdsCount: config.allowedChatIds.length,
+        minScore: config.minScore,
+      },
+    });
   }
   if (config.webhookSecret && req.headers['x-telegram-bot-api-secret-token'] !== config.webhookSecret) {
     return res.status(401).json({ ok: false });

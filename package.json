@@ -1,0 +1,10 @@
+{
+  "name": "meera-content-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot: scores Meera's notes and drafts LinkedIn posts in her voice",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  }
+}

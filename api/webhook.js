@@ -80,7 +80,9 @@ export default async function handler(req, res) {
 
 function isAllowed(chatId) {
   if (chatId === undefined || chatId === null) return false;
-  return config.allowedChatIds.length === 0 || config.allowedChatIds.includes(String(chatId));
+  const allowed = config.allowedChatIds.length === 0 || config.allowedChatIds.includes(String(chatId));
+  if (!allowed) console.warn(`Ignored message from chat ${chatId}: not in ALLOWED_CHAT_IDS (${config.allowedChatIds.join(', ')})`);
+  return allowed;
 }
 
 const confirmation = (status) =>

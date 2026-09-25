@@ -1,9 +1,12 @@
 // Telegram delivers every message sent to the bot here (POST /api/webhook).
 import { config } from '../lib/config.js';
 import { handleNote, handleReview } from '../lib/pipeline.js';
-import { sendMessage, answerCallback, removeButtons } from '../lib/telegram.js';
+import { sendMessage, sendTyping, answerCallback, removeButtons, downloadFile } from '../lib/telegram.js';
+import { transcribe } from '../lib/llm.js';
 
-const HELP = `Send me any note — an observation, a customer DM reaction, something you read.
+const MAX_AUDIO_BYTES = 20 * 1024 * 1024; // Telegram's bot download limit
+
+const HELP = `Send me any note, typed or as a voice note — an observation, a customer DM reaction, something you read.
 
 I'll score it 0-10. Notes scoring ${config.minScore}+ come back as a LinkedIn draft in your voice, with a news angle if a relevant one exists. Nothing is ever posted for you.
 
@@ -70,12 +73,30 @@ export default async function handler(req, res) {
 
     // Works for a private chat with the bot, a group, or a channel the bot is admin of.
     const msg = update.message ?? update.channel_post;
-    const text = (msg?.text ?? msg?.caption ?? '').trim();
+    let text = (msg?.text ?? msg?.caption ?? '').trim();
     chatId = msg?.chat?.id;
     if (!msg || !isAllowed(chatId)) return res.status(200).json({ ok: true });
 
+    // Voice notes (and audio files): transcribe, show Meera the transcript, then treat it as a note.
+    const audio = msg.voice ?? msg.audio;
+    if (audio) {
+      if (audio.file_size > MAX_AUDIO_BYTES) {
+        await sendMessage(chatId, 'That voice note is too long for me to process (over 20 MB). Try splitting it into shorter notes.', { replyTo: msg.message_id });
+        return res.status(200).json({ ok: true });
+      }
+      await sendTyping(chatId);
+      const buffer = await downloadFile(audio.file_id);
+      const transcript = await transcribe(buffer, audio.mime_type || 'audio/ogg');
+      if (!transcript || transcript === '[inaudible]') {
+        await sendMessage(chatId, 'I could not make out any words in that voice note. Try again somewhere quieter, or type it.', { replyTo: msg.message_id });
+        return res.status(200).json({ ok: true });
+      }
+      await sendMessage(chatId, `Transcript:\n${transcript}`, { replyTo: msg.message_id });
+      text = [text, transcript].filter(Boolean).join('\n\n'); // keep any caption she added
+    }
+
     if (!text) {
-      await sendMessage(chatId, 'I can only read text notes right now. Send the note as text (or paste the voice-note transcript).');
+      await sendMessage(chatId, 'I can read text notes and voice notes. Send one of those and I will score it.');
       return res.status(200).json({ ok: true });
     }
 

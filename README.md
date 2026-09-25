@@ -1,6 +1,6 @@
 # Meera Content Bot
 
-Meera drops a note into Telegram. The bot:
+Meera drops a note into Telegram, typed or as a voice note. Voice notes are transcribed by Gemini and the transcript is sent back so she can see what it heard. Then the bot:
 
 1. **Scores it 0–10** (Gemini Flash) with a one-line reason.
    - **Below 6:** replies with the score and why. No draft is made.
